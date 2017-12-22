@@ -1,7 +1,10 @@
 var base_url = "https://m.realestate.com.au";
+var apiKey = 'AIzaSyAEk2zBHs073Jmo9vwGki_2damJgBPoiHY';
+var url = "https://m.realestate.com.au/buy/with-4-bedrooms-between-0-600000-in-woodcroft%2c+sa+5162%3b+bellevue+heights%2c+sa+5050%3b+happy+valley%2c+sa+5159%3b+eden+hills%2c+sa+5050%3b+blackwood%2c+sa+5051%3b+coromandel+valley%2c+sa+5051%3b+flagstaff+hill%2c+sa+5159/list-1?misc=ex-under-contract&adcall=1513823650764";
+url = "dummy_data.html";
 
-url = "https://m.realestate.com.au/buy/with-4-bedrooms-between-0-600000-in-woodcroft%2c+sa+5162%3b+bellevue+heights%2c+sa+5050%3b+happy+valley%2c+sa+5159%3b+eden+hills%2c+sa+5050%3b+blackwood%2c+sa+5051%3b+coromandel+valley%2c+sa+5051%3b+flagstaff+hill%2c+sa+5159/list-1?misc=ex-under-contract&adcall=1513823650764";
 function getProperties(){
+    return;
     jQuery.ajax({
         url: url,
         complete: function(result){
@@ -93,18 +96,52 @@ function addBusRoutes(map){
 
     var kangarillaBusCoords = [{"lat":-35.1485,"lng":138.65926},{"lat":-35.1485,"lng":138.65926},{"lat":-35.14851,"lng":138.6612},{"lat":-35.1476,"lng":138.66109},{"lat":-35.11051,"lng":138.63122},{"lat":-35.10971,"lng":138.62989},{"lat":-35.10915,"lng":138.6222},{"lat":-35.09337,"lng":138.61262},{"lat":-35.08782,"lng":138.61337},{"lat":-35.08765,"lng":138.61294},{"lat":-35.08756,"lng":138.61311},{"lat":-35.08765,"lng":138.61294},{"lat":-35.08381,"lng":138.58363},{"lat":-35.08391,"lng":138.58192},{"lat":-35.084,"lng":138.57972},{"lat":-35.08117,"lng":138.56945},{"lat":-35.08119,"lng":138.56933},{"lat":-35.08128,"lng":138.56914},{"lat":-35.08171,"lng":138.5684},{"lat":-35.08254,"lng":138.55935},{"lat":-35.08232,"lng":138.54751},{"lat":-35.08301,"lng":138.5464},{"lat":-35.08302,"lng":138.54637},{"lat":-35.08605,"lng":138.54612},{"lat":-35.09456,"lng":138.54688},{"lat":-35.10383,"lng":138.54757},{"lat":-35.10398,"lng":138.54759},{"lat":-35.10431,"lng":138.54244},{"lat":-35.10469,"lng":138.53504},{"lat":-35.10473,"lng":138.53489},{"lat":-35.10838,"lng":138.53506},{"lat":-35.11461,"lng":138.53553},{"lat":-35.11503,"lng":138.53558},{"lat":-35.11499,"lng":138.5388}];
     kangarillaBus = addBusRoute(map, kangarillaBusCoords, '#0000FF');
-
 }
 
 function addBusRoute(map, coords, color){
-    var busRoute = new google.maps.Polyline({
-        path: coords,
-        geodesic: true,
-        strokeColor: color,
-        strokeOpacity: 1.0,
-        strokeWeight: 2
-    });
-    busRoute.setMap(map);
-    return busRoute;
+    var pathValues = [];
 
+    for(var i=0; i < coords.length; i++){
+        var marker = new google.maps.Marker({
+            position: coords[i], map: map, label: "" + (i+1)
+        });
+        pathValues.push(coords[i].lat + ',' + coords[i].lng);
+    }
+
+    jQuery.ajax({
+        url: 'https://roads.googleapis.com/v1/snapToRoads',
+        data: {
+            interpolate: true,
+            key: apiKey,
+            path: pathValues.join('|')
+        },
+        complete : function(request){
+            var data = jQuery.parseJSON(request.responseText);
+            var coords = processSnapToRoadResponse(data);
+            var busRoute = new google.maps.Polyline({
+                path: coords,
+                geodesic: true,
+                strokeColor: color,
+                strokeOpacity: 1.0,
+                strokeWeight: 2
+            });
+            busRoute.setMap(map);
+            return busRoute;
+
+        }
+    });
+}
+
+// Store snapped polyline returned by the snap-to-road service.
+function processSnapToRoadResponse(data) {
+    snappedCoordinates = [];
+    placeIdArray = [];
+    for (var i = 0; i < data.snappedPoints.length; i++) {
+        var latlng = new google.maps.LatLng(
+            data.snappedPoints[i].location.latitude,
+            data.snappedPoints[i].location.longitude);
+        snappedCoordinates.push(latlng);
+        placeIdArray.push(data.snappedPoints[i].placeId);
+    }
+    return snappedCoordinates;
 }
