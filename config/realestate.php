@@ -8,12 +8,12 @@
 
 return [
     'suburbs' => [
-        'Woodcroft, SA 5162',
-        'Bellevue Heights, SA 5050',
-        'Happy Valley, SA 5159',
-        'Eden Hills, SA 5050',
-        'Blackwood, SA 5051',
-        'Coromandel Valley, SA 5051',
-        'Flagstaff Hill, SA 5159'
+        [ 'locality' => 'Woodcroft', 'subdivision' => 'SA', 'postcode' => '5162'],
+        [ 'locality' => 'Bellevue Heights', 'subdivision' => 'SA', 'postcode' => '5050' ],
+        [ "locality" => "Happy Valley", "subdivision" => "SA", "postcode" => "5159" ],
+        [ "locality" => "Eden Hills", "subdivision" => "SA", "postcode" => "5050" ],
+        [ "locality" => "Blackwood", "subdivision" => "SA", "postcode" => "5051" ],
+        [ "locality" => "Coromandel Valley", "subdivision" => "SA", "postcode" => "5051" ],
+        [ "locality" => "Flagstaff Hill", "subdivision" => "SA", "postcode" => "5159" ]
     ]
 ];

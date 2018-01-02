@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Property;
 use Illuminate\Console\Command;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Client;
@@ -37,47 +38,75 @@ class ImportRealestate extends Command
         $result = $client->get($url);
 
         $data = ($result->getBody()->getContents());
-        return $this->parseREPage($data);
-    }
-
-    protected function parseREPage($data){
-        preg_match_all("/<script[\s\S]*?>([\s\S]*?)<\/script>/", $data, $matches);
-        $results = array();
-        foreach($matches[1] as $match){
-            if( strpos($match, "REA.resultsData =") !== false ) {
-                $item = substr($match, strpos($match, "REA.resultsData =")+18, strlen($match));
-                $results = json_decode($item, true);
-            }
-        }
-        return $results;
+        return $data;
     }
 
     protected function getResultData(){
+        $data = file_get_contents('all_properties.json' );
+        return \json_decode($data, true);
+
         $totalResults = [];
 
-        $url = "https://m.realestate.com.au/buy/with-4-bedrooms-between-0-650000-in-";
         $suburbs = config('realestate.suburbs');
-        foreach($suburbs as $suburb){
-            $url .= urlencode($suburb . ";");
-        }
-        $url .= "/list-1?activeSort=list-date&adcall=1514348785943";
+        $data = $this->getREQuery($suburbs);
 
-        echo "Get $url \n";
-        $data = $this->parseREPage( file_get_contents("dummy_data.html") ); //$this->getResultUrl($url);
         $total = $data['totalResultsCount'];
         $currentPage = $data['resolvedQuery']['page'];
         $pageSize = $data['resolvedQuery']['pageSize'];
+        $totalRead = $pageSize;
 
-        echo "On page $currentPage of $total results of $pageSize each page\n";
-        return;
-        $BreakOut = 20;
-        while(isset($data['_links']) && isset($data['_links']['next'])){
-            $nextLink = $data['_links']['next']['href'];
-            echo "Get " . $nextLink . "\n";
-            $data = $this->getResultUrl($nextLink);
+        foreach($data['tieredResults'] as $key=>$list){
+            $totalResults = array_merge($totalResults, $list['results']);
+        }
+
+        $BreakOut = 0;
+        while($totalRead < $total){
+            $currentPage++;
+            $data = $this->getREQuery($suburbs, $currentPage);
+            foreach($data['tieredResults'] as $key=>$list){
+                $totalResults = array_merge($totalResults, $list['results']);
+            }
+            $totalRead += $pageSize;
             sleep(1);
             $BreakOut++;
+            if($BreakOut >= 10) {
+                break;
+            }
         }
+        return $totalResults;
+    }
+
+    protected function getREQuery($suburbs, $page = 1){
+        $baseUrl = "https://services.realestate.com.au/services/listings/search?query=%s";
+        $data = array(
+            'channel' => 'buy',
+            'localities' => $suburbs,
+            'pageSize' => 50,
+            'page' => $page,
+            'sortType' => 'new-desc',
+            'filters' => array(
+                'priceRange' => array('minimum'=>'0', 'maximum' => '650000'),
+                'bedroomsRange' => array('minimum'=> '4'),
+                'surroundingSuburbs' => true
+            )
+        );
+        $data = urlencode( json_encode($data) );
+        $baseUrl = sprintf($baseUrl, $data);
+        $response = $this->getResultUrl($baseUrl);
+        file_put_contents("page_$page.json", $response);
+
+        $data = \json_decode( $response, true );
+        return $data;
+    }
+
+    protected function getImage($url, $toFile){
+        $headers = ['Referer' => 'https://m.realestate.com.au'];
+        $client = new Client(['headers'=>$headers]); //GuzzleHttp\Client
+        $result = $client->get($url);
+        $data = ($result->getBody()->getContents());
+
+        file_put_contents($toFile, $data);
+        return $data;
     }
 
     /**
@@ -86,8 +115,12 @@ class ImportRealestate extends Command
      * @return mixed
      */
     public function handle() {
-        $data = $this->getResultData();
 
+        $data = $this->getResultData();
+        foreach($data as $property){
+            Property::importRealEstateComAu($property);
+
+        }
         echo "Done\n";
     }
 }
